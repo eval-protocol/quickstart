@@ -6,7 +6,7 @@ The remote server handles:
 1. SVG code generation from text prompts (model calls)
 
 The local test handles:
-2. SVG to PNG rendering using Selenium  
+2. SVG to PNG rendering using Selenium
 3. LLM judge evaluation of requirement fulfillment
 4. Scoring based on fulfilled requirements ratio
 """
@@ -24,7 +24,7 @@ import asyncio
 import litellm
 from pydantic import BaseModel
 
-from eval_protocol.models import EvaluateResult, EvaluationRow, InputMetadata, Message, MetricResult
+from eval_protocol.models import EvaluateResult, EvaluationRow
 from eval_protocol.pytest import evaluation_test
 from eval_protocol.pytest.remote_rollout_processor import RemoteRolloutProcessor
 
@@ -36,61 +36,6 @@ logger = logging.getLogger(__name__)
 class SVGBenchResponse(BaseModel):
     reasoning: str
     number_of_fulfilled_requirements: int
-
-
-class IntentMatchingResponse(BaseModel):
-    """Response structure for intent matching evaluation."""
-
-    intent_reasoning: str
-    intent_matching_score: float  # 0-1: Does the content match the intended purpose?
-
-
-
-def svgbench_to_evaluation_row(data: List[Dict[str, Any]]) -> List[EvaluationRow]:
-    """
-    Convert SVGBench dataset entries to EvaluationRow objects.
-
-    Args:
-        data: List of dictionaries containing prompt and requirements
-
-    Returns:
-        List of EvaluationRow objects
-    """
-    rows = []
-
-    for i, row in enumerate(data):
-        # Format requirements as numbered list
-        requirements = "\n".join([f"{i + 1}. {req}" for i, req in enumerate(row["requirements"])])
-
-        # Create the generation prompt following SVGBench format
-        prompt = f"""{row["prompt"]} Wrap the SVG code in an SVG code block following the example below.
-
-Example:
-```svg
-<svg viewBox="0 0 100 100" width="100" height="100">
-    <circle cx="50" cy="50" r="40" fill="red" />
-</svg>
-```
-
-Requirements:
-{requirements}"""
-
-        eval_row = EvaluationRow(
-            messages=[Message(role="user", content=prompt)],
-            input_metadata=InputMetadata(
-                row_id=f"row_{i}",
-                dataset_info={
-                    "original_prompt": row["prompt"],
-                    "requirements": row["requirements"],
-                    "total_requirements": len(row["requirements"]),
-                    "formatted_prompt": prompt,
-                },
-            ),
-        )
-
-        rows.append(eval_row)
-
-    return rows
 
 
 async def evaluate_with_llm_judge(image_path: str, requirements: List[str]) -> Dict[str, Any]:
@@ -164,7 +109,6 @@ Requirements:
 
 @evaluation_test(
     input_dataset=[str(Path(__file__).parent / "svgbench_dataset.jsonl")],
-    dataset_adapter=svgbench_to_evaluation_row,
     completion_params=[
         {
             "temperature": 0.8,
@@ -187,7 +131,7 @@ async def test_svg_generation_evaluation(row: EvaluationRow) -> EvaluationRow:
     This evaluation asks: How many of the requirements were fulfilled?
     """
     assert row.input_metadata.dataset_info is not None
-    
+
     # Extract dataset info
     requirements = row.input_metadata.dataset_info["requirements"]
     total_requirements = row.input_metadata.dataset_info["total_requirements"]
@@ -204,7 +148,7 @@ async def test_svg_generation_evaluation(row: EvaluationRow) -> EvaluationRow:
 
     model_response = row.messages[-1].content
     assert isinstance(model_response, str)
-    
+
     # Extract SVG code
     try:
         svg_code = extract_svg_code(model_response)
@@ -234,7 +178,11 @@ async def test_svg_generation_evaluation(row: EvaluationRow) -> EvaluationRow:
         try:
             svg_render_success = await asyncio.to_thread(render_svg_to_png, svg_code, png_path)
             if not svg_render_success:
-                row.evaluation_result = EvaluateResult(score=0.0, reason="Failed to render SVG to PNG - render_svg_to_png returned False", is_score_valid=False)
+                row.evaluation_result = EvaluateResult(
+                    score=0.0,
+                    reason="Failed to render SVG to PNG - render_svg_to_png returned False",
+                    is_score_valid=False,
+                )
                 return row
         except Exception as e:
             # Capture full stack trace for debugging
@@ -244,7 +192,7 @@ async def test_svg_generation_evaluation(row: EvaluationRow) -> EvaluationRow:
             return row
 
         # Run LLM judge evaluation
-        judge_result = await evaluate_with_llm_judge(png_path, original_prompt, requirements)
+        judge_result = await evaluate_with_llm_judge(png_path, requirements)
 
         # Calculate score
         fulfilled_count = judge_result.get("number_of_fulfilled_requirements", 0)
