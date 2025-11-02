@@ -118,8 +118,7 @@ Start the RFT training job:
 
 ```bash
 eval-protocol create rft \
-  --base-model accounts/fireworks/models/qwen3-0p6b \
-  --evaluator-id test-svgagent-test-svg-generation-evaluation
+  --base-model accounts/fireworks/models/qwen3-0p6b
 ```
 
 > **Training Parameters**: We use Eval Protocol's default values for training parameters (batch size, epochs, learning rate, LoRA rank, accelerator count, etc.). For a complete list of available RFT flags you can customize, see [Fireworks RFT Command Documentation](https://docs.fireworks.ai/tools-sdks/firectl/commands/create-reinforcement-fine-tuning-job).
