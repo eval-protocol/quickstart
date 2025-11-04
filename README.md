@@ -35,7 +35,7 @@ pip install "eval-protocol[svgbench]"
 
 3. **Environment Setup for Local Dry Run**:
 
-Make a copy of `.env.example`, name it `.env`, and fill in the keys for `FIREWORKS_API_KEY` and `OPENAI_API_KEY`. Make sure `.env` is under the `/evaluator` folder!
+Make a copy of `env.example`, name it `.env`, and fill in the keys for `FIREWORKS_API_KEY` and `OPENAI_API_KEY`. Make sure `.env` is under the `/evaluator` folder!
 
 ## Running Locally
 
