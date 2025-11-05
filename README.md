@@ -33,9 +33,16 @@ A big thank you to [SVGBench](https://github.com/johnbean393/SVGBench) for the d
 pip install "eval-protocol[svgbench]"
 ```
 
-3. **Environment Setup for Local Dry Run**:
+3. **Environment Setup**:
 
-Make a copy of `env.example`, name it `.env`, and fill in the keys for `FIREWORKS_API_KEY` and `OPENAI_API_KEY`. Make sure `.env` is under the `/evaluator` folder!
+Make a copy of `env.example`, name it `.env`, and fill in the keys:
+
+```
+FIREWORKS_API_KEY=your-fireworks-key-here
+OPENAI_API_KEY=your-openai-key-here>
+```
+
+This file should be placed in your evaluator directory (e.g., `evaluator/.env`). The create process below will automatically read and upload these secrets to Fireworks.
 
 ## Running Locally
 
@@ -45,43 +52,23 @@ Make a copy of `env.example`, name it `.env`, and fill in the keys for `FIREWORK
 ep logs
 ```
 
-### Option A: Using our Vercel Remote Server (Recommended)
+**Terminal 2** - Kick off the test:
 
 ```bash
 pytest evaluator/test_svgagent.py -vs
 ```
 
-The test automatically uses the remote server:
+The test automatically uses our Vercel remote server:
+
 ```
 rollout_processor=RemoteRolloutProcessor(
     remote_base_url="https://vercel-svg-server-ts.vercel.app",
 )
 ```
 
-### Option B: Local Development Server
+If you want to use a local development Vercel server instead, see [Local Development Server](#local-development-server)
 
-In a second terminal:
-
-```bash
-cd vercel_svg_server_ts
-vercel dev
-```
-
-Then swap out the `remote_base_url` to point to the local server you just started:
-```
-rollout_processor=RemoteRolloutProcessor(
-    remote_base_url="http://localhost:3000",
-)
-```
-
-And in a third terminal, run the evaluation:
-```bash
-pytest evaluator/test_svgagent.py -vs
-```
-
-> See [Vercel CLI documentation](https://vercel.com/docs/cli/dev) for more information on local development.
-
-### Expected Test Output (for both options):
+### Expected Test Output:
 
 The test should automatically open a browser page to view results. If it doesn't, navigate to http://localhost:8000.
 
@@ -98,48 +85,50 @@ PASSED
   <img alt="Eval Protocol Logs Interface" src="assets/ep_logs.png" width="600">
 </p>
 
-### Aside: How Remote Rollout Processing Works
+If you're interested in understanding how Remote Rollout Processing works and how it communicates with the remote server, see [How Remote Rollout Processing Works](#how-remote-rollout-processing-works).
 
-Eval Protocol enables **reinforcement learning that meets you where you are**. Instead of forcing you to rewrite your agent in a specific framework, you can implement a lightweight remote server wherever your codebase and infrastructure already live.
+## Single Command to Train
 
-Your remote server is only responsible for:
-- **Executing rollouts** - Run your agent logic (in this case, SVG generation from text prompts)
-- **Logging to tracing** - Send structured logs to `tracing.fireworks.ai` for evaluation (see the below linked docs for more information)
-
-In this example, we showcase a **Vercel TypeScript server** that executes single-turn SVG code generation.
-
-> **📖 Learn More**: For a complete deep-dive into Remote Rollout Processing, see the [Remote Rollout Processor Tutorial](https://evalprotocol.io/tutorial/remote-rollout-processor).
-
-## Training Pipeline
-
-### 1. Upload Evaluator
-
-Deploy your evaluation logic:
+To kickoff training, simply do:
 
 ```bash
 cd evaluator
-eval-protocol upload --entry "test_svgagent::test_svg_generation_evaluation"
-cd ..
-```
-
-Monitor the evaluator build status at: https://app.fireworks.ai/dashboard/evaluators/test-svgagent-test-svg-generation-evaluation
-
-> **Note**: Wait for the evaluator status to change from "Building" to "Active" before proceeding (typically takes a few minutes).
-
-### 2. Launch Reinforcement Fine Tuning
-
-Start the RFT training job:
-
-```bash
 eval-protocol create rft \
   --base-model accounts/fireworks/models/qwen3-0p6b
 ```
 
-> **Training Parameters**: We use Eval Protocol's default values for training parameters (batch size, epochs, learning rate, LoRA rank, accelerator count, etc.). For a complete list of available RFT flags you can customize, see [Fireworks RFT Command Documentation](https://docs.fireworks.ai/tools-sdks/firectl/commands/create-reinforcement-fine-tuning-job).
-> 
-> **Dataset Upload**: The dataset is automatically uploaded from the `svgbench_dataset.jsonl` file referenced in your evaluator. You can confirm the dataset upload at: https://app.fireworks.ai/dashboard/datasets
+This command:
+1. **🔐 Uploads Secrets** - Automatically reads your `.env` file and uploads API keys as Fireworks secrets
+2. **📦 Uploads Evaluator** - Packages and uploads your evaluation code
+3. **⏳ Waits for Build** - Polls evaluator status every 10 seconds until ACTIVE (timeout: 10 minutes)
+4. **📊 Creates Dataset** - Automatically uploads your `svgbench_dataset.jsonl` 
+5. **🚀 Launches RFT Job** - Starts reinforcement fine-tuning with your evaluator
 
-### 3. Monitor Training Progress
+### Configuration & Troubleshooting
+
+**Training Parameters**: We use Eval Protocol's default values for training parameters (batch size, epochs, learning rate, LoRA rank, accelerator count, etc.). For a complete list of available RFT flags you can customize, see [Fireworks RFT Command Documentation](https://docs.fireworks.ai/tools-sdks/firectl/commands/create-reinforcement-fine-tuning-job).
+
+**Changing Evaluators**: If you've made changes to your evaluator code and want to upload a new version:
+
+```bash
+eval-protocol create rft \
+  --base-model accounts/fireworks/models/qwen3-0p6b \
+  --force
+```
+
+**Evaluator Upload Timing Out**: If your evaluator takes longer than 10 minutes to build, you'll see:
+
+```
+⏰ Timeout after 10.0m - evaluator is not yet ACTIVE
+
+❌ Evaluator is not ready within the timeout period.
+📊 Please check the evaluator status at: https://app.fireworks.ai/dashboard/evaluators/test-svgagent-test-svg-generation-evaluation
+   Wait for it to become ACTIVE, then run 'eval-protocol create rft' again.
+```
+
+In this case, monitor the evaluator upload at the link, and run the command again when ACTIVE.
+
+### Monitor Training Progress
 
 After successful job creation, you'll see:
 
@@ -213,3 +202,38 @@ Clicking on **View Logs** takes you to a page of logs being streamed in. Here, y
 - [Remote Rollout Processor Tutorial](https://evalprotocol.io/tutorial/remote-rollout-processor)
 - [SVGBench Dataset](https://github.com/johnbean393/SVGBench) - The original benchmark this project is based on
 - [Fireworks AI Platform](https://fireworks.ai)
+
+## Appendix
+
+### How Remote Rollout Processing Works
+
+Eval Protocol enables **reinforcement learning that meets you where you are**. Instead of forcing you to rewrite your agent in a specific framework, you can implement a lightweight remote server wherever your codebase and infrastructure already live.
+
+Your remote server is only responsible for:
+- **Executing rollouts** - Run your agent logic (in this case, SVG generation from text prompts)
+- **Logging to tracing** - Send structured logs to `tracing.fireworks.ai` for evaluation (see the below linked docs for more information)
+
+In this example, we showcase a **Vercel TypeScript server** that executes single-turn SVG code generation.
+
+> **📖 Learn More**: For a complete deep-dive into Remote Rollout Processing, see the [Remote Rollout Processor Tutorial](https://evalprotocol.io/tutorial/remote-rollout-processor).
+
+### Local Development Server
+
+```bash
+cd vercel_svg_server_ts
+vercel dev
+```
+
+Then swap out the `remote_base_url` to point to the local server you just started:
+```
+rollout_processor=RemoteRolloutProcessor(
+    remote_base_url="http://localhost:3000",
+)
+```
+
+And in a third terminal, run the evaluation:
+```bash
+pytest evaluator/test_svgagent.py -vs
+```
+
+> See [Vercel CLI documentation](https://vercel.com/docs/cli/dev) for more information on local development.
