@@ -22,6 +22,17 @@ A big thank you to [SVGBench](https://github.com/johnbean393/SVGBench) for the d
 
 **The Evaluation Process**: The model generates SVG code from text prompts, we render the SVGs to images, and then use GPT-4.1 as a visual judge to count how many requirements were fulfilled. This gives us concrete scores to measure improvement and lets you see dramatic before/after visual comparisons as your model gets better through training.
 
+## Watch a Walkthrough
+
+<div>
+  <a href="https://www.loom.com/share/24ba433601de45ba8b63d9fb34c31fd5">
+    <p>Getting Started with Eval Protocol for Reinforcement Learning 🚀 - Watch Video</p>
+  </a>
+  <a href="https://www.loom.com/share/24ba433601de45ba8b63d9fb34c31fd5">
+    <img src="https://cdn.loom.com/sessions/thumbnails/24ba433601de45ba8b63d9fb34c31fd5-27093815d3883a12-full-play.gif">
+  </a>
+</div>
+
 ## Quick Start
 
 ### Installation
