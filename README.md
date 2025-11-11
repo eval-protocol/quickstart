@@ -131,6 +131,7 @@ This command:
 ```bash
 eval-protocol create rft \
   --base-model accounts/fireworks/models/qwen3-0p6b \
+  --epochs 8 \
   --force
 ```
 
