@@ -32,3 +32,6 @@ Thumbs.db
 
 # Debug files
 svgbench_debug_intent_matching/
+
+# Evaluator caches
+/evaluator/.cache/

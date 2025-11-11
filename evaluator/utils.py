@@ -54,6 +54,7 @@ def render_svg_to_png(svg_code: str, output_path: str) -> bool:
         try:
             from selenium import webdriver
             from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
             from selenium.webdriver.common.by import By
             from selenium.webdriver.support import expected_conditions as EC
             from selenium.webdriver.support.ui import WebDriverWait
@@ -107,6 +108,9 @@ def render_svg_to_png(svg_code: str, output_path: str) -> bool:
         chrome_options.add_argument("--disable-web-security")
         chrome_options.add_argument(f"--window-size={width},{height}")
         chrome_options.add_argument("--force-device-scale-factor=1")
+        chrome_bin = os.environ.get("CHROME_BIN")
+        if chrome_bin and os.path.exists(chrome_bin):
+            chrome_options.binary_location = chrome_bin
 
         # Create temporary HTML file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as temp_html:
@@ -115,7 +119,35 @@ def render_svg_to_png(svg_code: str, output_path: str) -> bool:
 
         try:
             # Launch browser and take screenshot
-            driver = webdriver.Chrome(options=chrome_options)
+            # Try system chromedriver first; otherwise fall back to Selenium Manager.
+            candidate_paths = [
+                os.environ.get("CHROMEDRIVER"),
+                "/usr/bin/chromedriver",
+                "/usr/local/bin/chromedriver",
+            ]
+            chromedriver_path = next((p for p in candidate_paths if p and os.path.exists(p)), None)
+            driver = None
+            if chromedriver_path:
+                try:
+                    service = Service(executable_path=chromedriver_path)
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                except Exception as inner_e:
+                    # Fall back to Selenium Manager below
+                    driver = None
+            if driver is None:
+                # Fallback: let Selenium Manager resolve a driver
+                try:
+                    driver = webdriver.Chrome(options=chrome_options)
+                except Exception as inner_e:
+                    checked = ", ".join([p for p in candidate_paths if p])
+                    raise RuntimeError(
+                        "Failed to start ChromeDriver. "
+                        "Install system chromedriver (e.g., apt-get install chromium-driver) "
+                        "or set CHROMEDRIVER to its absolute path, "
+                        "or allow Selenium Manager to resolve a driver. "
+                        f"Checked system paths: {checked or 'none'}. "
+                        f"Inner error: {inner_e}"
+                    ) from inner_e
 
             # Set window size explicitly after driver creation
             driver.set_window_size(width, height + 139)

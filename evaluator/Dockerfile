@@ -6,6 +6,7 @@ WORKDIR /app
 # Install system dependencies for SVG rendering
 RUN apt-get update && apt-get install -y \
     chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker caching
