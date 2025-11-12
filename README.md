@@ -258,7 +258,7 @@ rollout_processor=RemoteRolloutProcessor(
 
 And in a third terminal, run the evaluation:
 ```bash
-python evaluator/svgagent.py
+ep local-test
 ```
 
 > See [Vercel CLI documentation](https://vercel.com/docs/cli/dev) for more information on local development.
