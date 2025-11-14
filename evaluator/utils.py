@@ -4,9 +4,7 @@ import re
 import logging
 import tempfile
 import os
-import threading
-import atexit
-import base64
+import shutil
 import time
 
 
@@ -108,9 +106,16 @@ def render_svg_to_png(svg_code: str, output_path: str) -> bool:
         chrome_options.add_argument("--disable-web-security")
         chrome_options.add_argument(f"--window-size={width},{height}")
         chrome_options.add_argument("--force-device-scale-factor=1")
-        chrome_bin = os.environ.get("CHROME_BIN")
-        if chrome_bin and os.path.exists(chrome_bin):
-            chrome_options.binary_location = chrome_bin
+
+        # Resolve browser binary: prefer explicit CHROME_BIN, then common Chromium locations (for Docker).
+        browser_bin = (
+            os.environ.get("CHROME_BIN")
+            or shutil.which("chromium")
+            or shutil.which("chromium-browser")
+            or "/usr/lib/chromium/chromium"
+        )
+        if browser_bin and os.path.exists(browser_bin):
+            chrome_options.binary_location = browser_bin
 
         # Create temporary HTML file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as temp_html:
@@ -119,33 +124,31 @@ def render_svg_to_png(svg_code: str, output_path: str) -> bool:
 
         try:
             # Launch browser and take screenshot
-            # Try system chromedriver first; otherwise fall back to Selenium Manager.
-            candidate_paths = [
-                os.environ.get("CHROMEDRIVER"),
-                "/usr/bin/chromedriver",
-                "/usr/local/bin/chromedriver",
-            ]
-            chromedriver_path = next((p for p in candidate_paths if p and os.path.exists(p)), None)
+            # Prefer an explicit chromedriver if available; otherwise fall back to Selenium Manager.
+            driver_path = os.environ.get("CHROMEDRIVER") or shutil.which("chromedriver")
+
             driver = None
-            if chromedriver_path:
+            if driver_path and os.path.exists(driver_path):
                 try:
-                    service = Service(executable_path=chromedriver_path)
+                    service = Service(executable_path=driver_path)
                     driver = webdriver.Chrome(service=service, options=chrome_options)
-                except Exception as inner_e:
+                except Exception:
                     # Fall back to Selenium Manager below
                     driver = None
+
             if driver is None:
                 # Fallback: let Selenium Manager resolve a driver
                 try:
                     driver = webdriver.Chrome(options=chrome_options)
                 except Exception as inner_e:
-                    checked = ", ".join([p for p in candidate_paths if p])
+                    checked_paths = [p for p in [os.environ.get("CHROMEDRIVER"), driver_path] if p]
+                    checked = ", ".join(checked_paths)
                     raise RuntimeError(
                         "Failed to start ChromeDriver. "
                         "Install system chromedriver (e.g., apt-get install chromium-driver) "
                         "or set CHROMEDRIVER to its absolute path, "
                         "or allow Selenium Manager to resolve a driver. "
-                        f"Checked system paths: {checked or 'none'}. "
+                        f"Checked paths: {checked or 'none'}. "
                         f"Inner error: {inner_e}"
                     ) from inner_e
 
