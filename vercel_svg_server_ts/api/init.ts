@@ -1,12 +1,5 @@
 /**
  * Vercel serverless function for SVGBench remote evaluation
- *
- * TypeScript port of the Python Flask server with:
- * - Fire-and-forget async processing
- * - Comprehensive logging with Fireworks tracing
- * - Robust error handling with Status codes
- * - Full CORS support
- * - Vercel production optimization
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -15,47 +8,11 @@ import { initRequestSchema, InitRequest } from '../src/models/types.js';
 import { Status } from '../src/models/status.js';
 import { mapOpenAIErrorToStatus } from '../src/models/exceptions.js';
 import { resolveApiKey } from '../src/config/environment.js';
+import { createRolloutLogger } from '../src/config/logger.js';
+import { withFireworksLogging } from '../src/config/fireworks-vercel.js';
 
-// Simple Fireworks logging function
-async function logToFireworks(rolloutId: string, message: string, status: Status, apiKey: string): Promise<void> {
-  try {
-    const payload = {
-      program: "eval_protocol",
-      message: message,
-      tags: [`rollout_id:${rolloutId}`],
-      extras: {
-        logger_name: `__main__.${rolloutId}`,
-        level: "INFO",
-        timestamp: new Date().toISOString()
-      },
-      status: {
-        code: status.code,
-        message: status.message,
-        details: status.details
-      }
-    };
 
-    const url = process.env.FW_TRACING_GATEWAY_BASE_URL || 'https://tracing.fireworks.ai';
-
-    const response = await fetch(`${url}/logs`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'typescript-fetch/1.0.0'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      console.error(`[FIREWORKS] Failed to log rollout ${rolloutId}: ${response.status}`);
-    }
-  } catch (error: any) {
-    console.error(`[FIREWORKS] Error logging rollout ${rolloutId}:`, error.message);
-  }
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -87,6 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let rolloutId: string | undefined;
   let apiKey: string | null = null;
+  let logger: any = null;
 
   try {
     // Parse and validate request body
@@ -94,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!parseResult.success) {
       const errorMsg = `Invalid request format: ${parseResult.error.message}`;
-      console.error(`INFO:rollout:unknown:${errorMsg}`);
+      console.error(`ERROR:rollout:unknown:${errorMsg}`);
 
       return res.status(400).json({
         error: errorMsg,
@@ -105,12 +63,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const initRequest: InitRequest = parseResult.data;
     rolloutId = initRequest.metadata.rollout_id;
 
-    console.log(`INFO:rollout:${rolloutId}:Received rollout request`);
+    // Initialize rollout-specific logger for this rollout
+    logger = createRolloutLogger(rolloutId);
+    logger.info('Received rollout request');
 
     // Validate required fields
     if (!initRequest.messages || initRequest.messages.length === 0) {
       const errorMsg = 'messages is required and cannot be empty';
-      console.error(`INFO:rollout:${rolloutId}:${errorMsg}`);
+      logger.error(errorMsg);
 
       return res.status(400).json({
         error: errorMsg,
@@ -122,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     apiKey = resolveApiKey(initRequest.api_key);
     if (!apiKey) {
       const errorMsg = 'API key not provided in request or FIREWORKS_API_KEY environment variable';
-      console.error(`INFO:rollout:${rolloutId}:${errorMsg}`);
+      logger.error(errorMsg);
 
       return res.status(401).json({
         error: errorMsg,
@@ -139,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const model = initRequest.completion_params?.model;
-    console.log(`INFO:rollout:${rolloutId}:Sending completion request to model ${model}`);
+    logger.info(`Sending completion request to model ${model}`);
 
     // Prepare completion arguments - sanitize messages
     const allowedMessageFields = new Set([
@@ -201,17 +161,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Debug log showing what we're sending (similar to Python version)
     const maskedApiKey = apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : 'undefined';
 
-    console.log(`INFO:rollout:${rolloutId}:DEBUG: ${initRequest.model_base_url}, COMPLETION_KWARGS: ${JSON.stringify(completionParams)}, API_KEY: ${maskedApiKey}, MODEL: ${model}, BASE_URL: ${initRequest.model_base_url}`);
+    logger.info(`DEBUG: ${initRequest.model_base_url}, COMPLETION_KWARGS: ${JSON.stringify(completionParams)}, API_KEY: ${maskedApiKey}, MODEL: ${model}, BASE_URL: ${initRequest.model_base_url}`);
 
     // Perform chat completion synchronously
     const completion = await openaiClient.chat.completions.create(completionParams);
-
-    const duration = Date.now() - startTime;
-    console.log(`INFO:rollout:${rolloutId}:Rollout ${rolloutId} completed successfully`);
-
-    // Log to Fireworks tracing system synchronously
+    
     const status = Status.rolloutFinished();
-    await logToFireworks(rolloutId!, `Rollout ${rolloutId} completed`, status, apiKey);
+    logger.info(`Rollout ${rolloutId} completed`, { status });
 
     // Return successful response with completion
     return res.status(200).json({
@@ -223,12 +179,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: any) {
     // Handle all errors in one place
     const status = mapOpenAIErrorToStatus(error);
-    console.error(`INFO:rollout:${rolloutId || 'unknown'}:Rollout ${rolloutId} failed: ${error.message}`);
-
-    // Log error to Fireworks tracing system synchronously (only if we have rolloutId and apiKey)
-    if (rolloutId && apiKey) {
-      await logToFireworks(rolloutId, `Rollout ${rolloutId} failed: ${error.message}`, status, apiKey);
-    }
+    
+    logger.error(`Rollout ${rolloutId} failed: ${error.message}`, { status });
 
     // Return appropriate HTTP status based on error type
     if (error instanceof OpenAI.AuthenticationError || error instanceof OpenAI.PermissionDeniedError) {
@@ -275,3 +227,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 }
+
+export default withFireworksLogging(handler);
