@@ -15,7 +15,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@vercel/functions": "^1.4.0",
     "openai": "^4.104.0",
+    "winston": "^3.11.0",
+    "winston-transport": "^4.6.0",
+    "logform": "^2.6.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
