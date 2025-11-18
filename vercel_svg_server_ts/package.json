@@ -15,7 +15,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "eval-protocol": "^0.1.8"
+    "@vercel/functions": "^1.4.0",
+    "eval-protocol": "^0.1.10",
+    "openai": "^4.104.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
