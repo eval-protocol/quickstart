@@ -120,7 +120,7 @@ To kickoff training, simply do:
 cd evaluator
 eval-protocol create rft \
   --base-model accounts/fireworks/models/qwen3-0p6b \
-  --epochs 8 \
+  --accelerator-count 1 \
   --chunk-size 10
 ```
 
@@ -140,7 +140,7 @@ This command:
 ```bash
 eval-protocol create rft \
   --base-model accounts/fireworks/models/qwen3-0p6b \
-  --epochs 8 \
+  --accelerator-count 1 \
   --chunk-size 10 \
   --force
 ```
