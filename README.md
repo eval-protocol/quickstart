@@ -61,6 +61,12 @@ OPENAI_API_KEY=your-openai-key-here
 
 The create process below automatically reads and uploads these secrets to Fireworks.
 
+4. Local dependencies for `ep local-test`. You will need one of:
+
+Docker Desktop: https://docs.docker.com/desktop/setup/install/mac-install/
+
+Chromium: https://www.chromium.org/getting-involved/download-chromium/
+
 ## Running Locally
 
 **Terminal 1** - Start the local UI server to view results:
