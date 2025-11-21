@@ -97,7 +97,7 @@ If you want to use a local development Vercel server instead, see [Local Develop
 - If your evaluation setup has custom dependencies, for example Chromium, you will need containerize it using `Dockerfile`
   - Then, when you run `ep local-test`, we will build an image and run pytest inside Docker
 - If not, `ep local-test` will just run pytest on your host machine
-  - You can also ignore the `Dockerfile` and run on the host Python env using `ep local-test --ignore-docker`
+  - If you only have Chromium installed locally but not Docker Desktop, you can also ignore the `Dockerfile` and run on the host Python env using `ep local-test --ignore-docker`
 
 ### Expected Test Output:
 
