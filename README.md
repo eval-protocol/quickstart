@@ -126,7 +126,6 @@ To kickoff training, simply do:
 cd evaluator
 eval-protocol create rft \
   --base-model accounts/fireworks/models/qwen3-0p6b \
-  --accelerator-count 1 \
   --chunk-size 10
 ```
 
@@ -139,14 +138,13 @@ This command:
 
 ### Configuration & Troubleshooting
 
-**Training Parameters**: We use Eval Protocol's default values for training parameters (batch size, epochs, learning rate, LoRA rank, accelerator count, etc.). For a complete list of available RFT flags you can customize, see [Fireworks RFT Command Documentation](https://docs.fireworks.ai/tools-sdks/firectl/commands/create-reinforcement-fine-tuning-job).
+**Training Parameters**: We use Eval Protocol's default values for training parameters (batch size, epochs, learning rate, LoRA rank, etc.). For a complete list of available RFT flags you can customize, see [Fireworks RFT Command Documentation](https://docs.fireworks.ai/tools-sdks/firectl/commands/create-reinforcement-fine-tuning-job).
 
 **Changing Evaluators**: If you've made changes to your evaluator code and want to upload a new version:
 
 ```bash
 eval-protocol create rft \
   --base-model accounts/fireworks/models/qwen3-0p6b \
-  --accelerator-count 1 \
   --chunk-size 10 \
   --force
 ```
