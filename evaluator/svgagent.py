@@ -33,9 +33,6 @@ from utils import extract_svg_code, render_svg_to_png
 
 load_dotenv()
 
-assert os.environ.get("FIREWORKS_API_KEY"), "FIREWORKS_API_KEY environment variable is not set. Please export your Fireworks API key or add to .env file."
-assert os.environ.get("OPENAI_API_KEY"), "OPENAI_API_KEY environment variable is not set. Please export your OpenAI API key or add to .env file."
-
 logger = logging.getLogger(__name__)
 
 
