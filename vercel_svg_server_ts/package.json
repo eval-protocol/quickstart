@@ -16,7 +16,7 @@
   "license": "MIT",
   "dependencies": {
     "@vercel/functions": "^1.4.0",
-    "eval-protocol": "^0.1.10",
+    "eval-protocol": "^0.1.11",
     "openai": "^4.104.0"
   },
   "devDependencies": {
