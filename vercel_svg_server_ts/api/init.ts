@@ -14,7 +14,6 @@ import {
 } from 'eval-protocol';
 import { resolveApiKey } from '../src/config/environment.js';
 
-
 async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -48,6 +47,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   let rolloutId: string | undefined;
   let apiKey: string | null = null;
   let logger: any = null;
+  let modelBaseUrl: string | null = null;
 
   try {
     // Parse and validate request body
@@ -65,6 +65,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
 
     const initRequest: InitRequest = parseResult.data;
     rolloutId = initRequest.metadata.rollout_id;
+    modelBaseUrl = initRequest.model_base_url ?? null;
 
     // Initialize rollout-specific logger for this rollout
     logger = createRolloutLogger(rolloutId);
@@ -92,13 +93,17 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         rollout_id: rolloutId
       });
     }
+    logger = createRolloutLogger(rolloutId, {
+      gatewayBaseUrl: new URL(modelBaseUrl!).origin,
+      apiKey,
+    });
 
     const startTime = Date.now();
 
     // Create OpenAI client
     const openaiClient = new OpenAI({
       apiKey,
-      baseURL: initRequest.model_base_url!,  // Always provided in your use case
+      baseURL: modelBaseUrl!,  // Always provided in your use case
     });
 
     const model = initRequest.completion_params?.model;
@@ -164,7 +169,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     // Debug log showing what we're sending (similar to Python version)
     const maskedApiKey = apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : 'undefined';
 
-    logger.info(`DEBUG: ${initRequest.model_base_url}, COMPLETION_KWARGS: ${JSON.stringify(completionParams)}, API_KEY: ${maskedApiKey}, MODEL: ${model}, BASE_URL: ${initRequest.model_base_url}`);
+    logger.info(`DEBUG: ${modelBaseUrl}, COMPLETION_KWARGS: ${JSON.stringify(completionParams)}, API_KEY: ${maskedApiKey}, MODEL: ${model}, BASE_URL: ${modelBaseUrl}`);
 
     // Perform chat completion synchronously
     const completion = await openaiClient.chat.completions.create(completionParams);
@@ -183,7 +188,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle all errors in one place
     const status = mapOpenAIErrorToStatus(error);
     
-    logger.error(`Rollout ${rolloutId} failed: ${error.message}`, { status });
+    logger?.error(`Rollout ${rolloutId} failed: ${error.message}`, { status });
 
     // Return appropriate HTTP status based on error type
     if (error instanceof OpenAI.AuthenticationError || error instanceof OpenAI.PermissionDeniedError) {

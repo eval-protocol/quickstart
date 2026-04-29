@@ -16,7 +16,7 @@
   "license": "MIT",
   "dependencies": {
     "@vercel/functions": "^1.4.0",
-    "eval-protocol": "^0.1.11",
+    "eval-protocol": "file:vendor/eval-protocol-0.1.12-request-scoped-logger.tgz",
     "openai": "^4.104.0"
   },
   "devDependencies": {
